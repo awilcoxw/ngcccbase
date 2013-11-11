@@ -97,7 +97,7 @@ class QtUI(QtGui.QMainWindow):
         # set bitcoin addresses
         #bitcoin_asset = self.get_asset_definition('bitcoin')
         #bitcoin_addresses = [addr.get_address()
-        #                        for addr in self.walletController.get_all_addresses(bitcoin_asset)]
+        #   for addr in self.walletController.get_all_addresses(bitcoin_asset)]
         #self.overviewpage.update_btc_addresses(bitcoin_addresses)
         # set available monikers
         monikers = self.wallet.get_model().get_asset_definition_manager() \
@@ -117,16 +117,18 @@ class QtUI(QtGui.QMainWindow):
                 return
             message = 'Are you sure you want to send'
             for recipient in recipients:
-                message += '<br><b>{amount} {moniker}</b> to {address}'.format(**recipient)
+                message += '<br><b>{amount} {moniker}</b>' \
+                    ' to {address}'.format(**recipient)
             message += '?'
-            retval = QtGui.QMessageBox.question(self, 'Confirm send coins',
-                message,
+            retval = QtGui.QMessageBox.question(
+                self, 'Confirm send coins', message,
                 QtGui.QMessageBox.Yes | QtGui.QMessageBox.Cancel,
                 QtGui.QMessageBox.Cancel)
             if retval == QtGui.QMessageBox.Cancel:
                 return
             for recipient in recipients:
-                self.walletController.send_coins(recipient['address'],
+                self.walletController.send_coins(
+                    recipient['address'],
                     self.get_asset_definition(recipient['moniker']),
                     recipient['amount'])
         self.sendcoinspage.btn_send.clicked.connect(btn_send)
@@ -144,7 +146,8 @@ class QtUI(QtGui.QMainWindow):
                 asset = self.get_asset_definition(moniker)
                 balance = self.walletController.get_balance(asset)
                 self.sendcoinspage.set_max_amount(balance)
-        self.sendcoinspage.cb_monikers.currentIndexChanged.connect(updateAvailableBalance)
+        self.sendcoinspage.cb_monikers.currentIndexChanged.connect(
+            updateAvailableBalance)
 
     def gotoSendcoinsPage(self):
         # set available monikers
@@ -163,12 +166,16 @@ class QtUI(QtGui.QMainWindow):
 
     def gotoReceivePage(self):
         rows = []
-        monikers = self.wallet.get_model().get_asset_definition_manager().assdef_by_moniker.keys()
+        monikers = self.wallet.get_model().get_asset_definition_manager() \
+            .assdef_by_moniker.keys()
         for moniker in monikers:
-            addresses = self.walletController.get_all_addresses(self.get_asset_definition(moniker))
+            addresses = self.walletController.get_all_addresses(
+                self.get_asset_definition(moniker))
             for address in addresses:
-                rows.append({'address': address.get_address(), 'moniker': moniker, 'balance': '0'})
-        self.receivepage.update_addresses(rows)#[{'moniker': 'moniker', 'address': 'address', 'balance': '0.5'}])
+                rows.append(
+                    {'address': address.get_address(),
+                     'moniker': moniker, 'balance': '0'})
+        self.receivepage.update_addresses(rows)
         # goto
         self.stackedWidget.setCurrentWidget(self.receivepage)
         # change toolbar buttons
