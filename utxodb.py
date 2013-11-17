@@ -103,6 +103,12 @@ class UTXOStore(DataStore):
         return self.execute("SELECT * FROM utxo_data WHERE address = ?",
                             (address, )).fetchall()
 
+    def get_utxos_for_tx(self, txhash):
+        """Return the entire list of utxos for a given transaction <txhash>
+        """
+        return self.execute("SELECT * FROM utxo_data WHERE txhash = ?",
+                            (txhash, )).fetchall()
+
 
 class UTXOQuery(object):
     """Query object for getting data out of the UTXO data-store.
