@@ -24,13 +24,14 @@ class MockComm(object):
 class TestRealP2PTrade(unittest.TestCase):
 
     def setUp(self):
-        from pwallet import PersistentWallet
-        from wallet_controller import WalletController
+        from ...pwallet import PersistentWallet
+        from ...wallet_controller import WalletController
         self.pwallet = PersistentWallet()
         self.pwallet.init_model()
+        self.wctrl = WalletController(self.pwallet.wallet_model)
 
     def test_real(self):
-        ewctrl = EWalletController(self.pwallet.get_model())
+        ewctrl = EWalletController(self.pwallet.get_model(), self.wctrl)
         config = {"offer_expiry_interval": 30,
                   "ep_expiry_interval": 30}
         comm1 = MockComm()
@@ -55,8 +56,8 @@ class TestRealP2PTrade(unittest.TestCase):
 
         agent1.register_my_offer(ag1_offer)
         agent2.register_my_offer(ag2_offer)
-        for _ in xrange(3):
-            agent1.update_state()
-            agent2.update_state()
+#        for _ in xrange(3):
+#            agent1._update_state()
+#            agent2._update_state()
         
 

@@ -3,22 +3,7 @@
 import unittest
 
 from coloredcoinlib import ColorSet
-
-
-class MockColorMap:
-    def __init__(self, *args, **kwargs):
-        self.d = {0:""}
-        self.r = {"":0}
-        for i in range(1,10):
-            s = "obc:color_desc_%s:0:%s" % (i,i // 2)
-            self.d[i] = s
-            self.r[s] = i
-
-    def find_color_desc(self, color_id):
-        return self.d[color_id]
-
-    def resolve_color_desc(self, color_desc, auto_add=True):
-        return self.r[color_desc]
+from test_colormap import MockColorMap
 
 
 class TestColorSet(unittest.TestCase):
@@ -26,7 +11,7 @@ class TestColorSet(unittest.TestCase):
     def setUp(self):
         self.colormap = MockColorMap()
         d = self.colormap.d
-        self.colorset0 = ColorSet(self.colormap, [d[0]])
+        self.colorset0 = ColorSet(self.colormap, [''])
         self.colorset1 = ColorSet(self.colormap, [d[1]])
         self.colorset2 = ColorSet(self.colormap, [d[2]])
         self.colorset3 = ColorSet(self.colormap, [d[1], d[2]])
@@ -61,7 +46,6 @@ class TestColorSet(unittest.TestCase):
         self.assertEquals(self.colorset6.get_earliest(), "\x00\x00\x00\x00")
 
     def test_get_color_string(self):
-        self.assertEquals(self.colorset0.get_color_hash(), "JNu4AFCBNmTE1")
         self.assertEquals(self.colorset1.get_color_hash(), "CP4YWLr8aAe4Hn")
         self.assertEquals(self.colorset3.get_color_hash(), "ZUTSoEEwZY6PB")
 

@@ -1,12 +1,13 @@
-from coloredcoinlib import txspec, ColorSet
 from collections import defaultdict
+
+from coloredcoinlib import ColorSet, OperationalTxSpec
 from protocol_objects import ETxSpec
 from ngcccbase.utxodb import UTXO
 
 
 FEE = 15000
 
-class OperationalETxSpec(txspec.OperationalTxSpec):
+class OperationalETxSpec(OperationalTxSpec):
     def __init__(self, model, ewctrl):
         self.model = model
         self.ewctrl = ewctrl
@@ -35,7 +36,8 @@ class OperationalETxSpec(txspec.OperationalTxSpec):
                     css = colordata.get_colorvalues(color_set.color_id_set, inp[0], inp[1])
                     if (css and len(css) == 1):
                         cs = css[0]
-                        self.inputs[cs[0]].append((cs[1], inp))
+                        self.inputs[cs.get_color_id()].append((cs.get_value(),
+                                                               inp))
 
     def prepare_targets(self, etx_spec, their):
         self.targets = []
