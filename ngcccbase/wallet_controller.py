@@ -14,6 +14,10 @@ from wallet_model import ColorSet
 from txcons import BasicTxSpec, SimpleOperationalTxSpec
 
 
+class AssetMismatchError(Exception):
+    pass
+
+
 class WalletController(object):
     """Controller for a wallet. Used for executing tasks related to the wallet.
     """
@@ -70,8 +74,8 @@ class WalletController(object):
             # decode the address
             address_asset, address = adm.get_asset_and_address(target_addr)
             if asset != address_asset:
-                raise Exception("Address and asset don't match: %s %s" %
-                                (asset, address_asset))
+                raise AssetMismatchError("Address and asset don't match: %s %s" %
+                                         (asset, address_asset))
             assettarget = AssetTarget(address,
                                       AdditiveAssetValue(asset=asset,
                                                          value=raw_colorvalue))

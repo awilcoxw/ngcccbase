@@ -96,6 +96,8 @@ class FullScanColorDataBuilder(BasicColorDataBuilder):
             self.colordef.genesis['height'])
 
     def scan_block(self, blockhash):
+        if self.metastore.did_scan(self.color_id, blockhash):
+            return
         log("scan block %s", blockhash)
         for tx in self.blockchain_state.iter_block_txs(blockhash):
             self.scan_tx(tx)
@@ -124,10 +126,10 @@ class FullScanColorDataBuilder(BasicColorDataBuilder):
             blockhash, height = self.blockchain_state.get_previous_blockinfo(
                 blockhash)
             if blockhash == self.genesis_blockhash:
-                break
+                break  # pragma: no cover
             # sanity check
             if height < genesis_height:
-                break
+                break  # pragma: no cover
 
         self.scan_blockchain(blocklist)
 
@@ -137,7 +139,9 @@ class AidedColorDataBuilder(FullScanColorDataBuilder):
         from the color's genesis transaction output, for one specific color"""
 
     def scan_blockchain(self, blocklist):
-        txo_queue = [self.colordef.genesis]
+        txo = self.colordef.genesis.copy()
+        txo["blockhash"] = self.genesis_blockhash
+        txo_queue = [txo]
         for blockhash in blocklist:
             if self.metastore.did_scan(self.color_id, blockhash):
                 continue
@@ -151,7 +155,6 @@ class AidedColorDataBuilder(FullScanColorDataBuilder):
             while block_txo_queue:
                 txo = block_txo_queue.pop()
                 if txo['txhash'] in block_txos:
-                    # skip the ones we have already visited
                     continue
                 block_txos[txo['txhash']] = txo
                 spends = get_spends(txo['txhash'], self.blockchain_state)
@@ -160,7 +163,6 @@ class AidedColorDataBuilder(FullScanColorDataBuilder):
                         block_txo_queue.append(stxo)
                     else:
                         txo_queue.append(stxo)
-
             block_txs = {}
             for txhash in block_txos.keys():
                 block_txs[txhash] = self.blockchain_state.get_tx(txhash)
@@ -178,3 +180,4 @@ class AidedColorDataBuilder(FullScanColorDataBuilder):
 
             for tx in sorted_block_txs:
                 self.scan_tx(tx)
+            self.metastore.set_as_scanned(self.color_id, blockhash)

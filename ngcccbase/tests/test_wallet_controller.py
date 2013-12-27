@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
-import os
 import unittest
 
 from pycoin.tx.script import opcodes, tools
 
 from coloredcoinlib import ColorSet, InvalidColorDefinitionError
 from ngcccbase.pwallet import PersistentWallet
-from ngcccbase.wallet_controller import WalletController
+from ngcccbase.wallet_controller import WalletController, AssetMismatchError
 
 
 class MockBitcoinD(object):
@@ -27,15 +26,14 @@ class MockBitcoinD(object):
         return "11111111111111111111111111111111"
 
 
-class TestTxSpecs(unittest.TestCase):
+class TestWalletController(unittest.TestCase):
 
     def setUp(self):
         self.path = ":memory:"
-        self.pwallet = PersistentWallet(self.path)
         self.config = {'dw_master_key': 'test', 'testnet': True, 'ccc': {
                 'colordb_path' : self.path
                 }, 'bip0032': False }
-        self.pwallet.wallet_config = self.config
+        self.pwallet = PersistentWallet(self.path, self.config)
         self.pwallet.init_model()
         self.model = self.pwallet.get_model()
         self.wc = WalletController(self.model)
@@ -72,12 +70,18 @@ class TestTxSpecs(unittest.TestCase):
         self.wc.issue_coins(self.moniker, 'obc', 10000, 1)
         self.asset = self.model.get_asset_definition_manager(
             ).get_asset_by_moniker(self.moniker)
+        self.basset = self.model.get_asset_definition_manager(
+            ).get_asset_by_moniker('bitcoin')
         self.color_id = list(self.asset.color_set.color_id_set)[0]
         self.model.ccc.metastore.set_as_scanned(self.color_id, self.blockhash)
 
     def test_issue(self):
         self.assertRaises(InvalidColorDefinitionError, self.wc.issue_coins,
                           self.moniker, 'nonexistent', 10000, 1)
+        item = self.wc.get_history(self.asset)[0]
+        self.assertEqual(item['action'], 'issued')
+        self.assertEqual(item['value'], 10000)
+        self.wc.scan_utxos()
         item = self.wc.get_history(self.asset)[0]
         self.assertEqual(item['action'], 'issued')
         self.assertEqual(item['value'], 10000)
@@ -113,6 +117,8 @@ class TestTxSpecs(unittest.TestCase):
         addr2 = self.wc.get_new_address(self.asset)
         color_addrs = [addr1.get_color_address(), addr2.get_color_address()]
         self.wc.send_coins(self.asset, color_addrs, [1000, 2000])
+        self.assertRaises(AssetMismatchError, self.wc.send_coins, self.basset,
+                          color_addrs, [1000, 2000])
 
 
 if __name__ == '__main__':

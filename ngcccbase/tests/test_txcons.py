@@ -17,7 +17,8 @@ from ngcccbase.txcons import (InvalidTargetError, InvalidTransformationError,
 from ngcccbase.pwallet import PersistentWallet
 
 
-class TestTxSpecs(unittest.TestCase):
+
+class TestTxcons(unittest.TestCase):
 
     def setUp(self):
         self.path = ":memory:"
@@ -110,7 +111,6 @@ class TestTxSpecs(unittest.TestCase):
                           self.basic.make_operational_tx_spec, self.asset)
 
     def add_coins(self):
-
         script = tools.compile(
             "OP_DUP OP_HASH160 {0} OP_EQUALVERIFY OP_CHECKSIG".format(
                 self.address0.rawPubkey().encode("hex"))).encode("hex")

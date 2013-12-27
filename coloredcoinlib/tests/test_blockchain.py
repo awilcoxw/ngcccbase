@@ -11,6 +11,7 @@ class TestBlockchainState(unittest.TestCase):
     def setUp(self):
         self.bs = BlockchainState.from_url(None, True)
         self.blockhash = '00000000c927c5d0ee1ca362f912f83c462f644e695337ce3731b9f7c5d1ca8c'
+        self.previous_blockhash = '000000000001c503d2e3bff1d73eb53213a8d784206a233181ea11f95c5fd097'
         self.txhash = '72386db4bf4ced6380763d3eb09b634771ba519e200b57da765def26219ef508'
         self.height = 154327
         self.coinbase = '4fe45a5ba31bab1e244114c4555d9070044c73c98636231c77657022d76b87f7'
@@ -38,6 +39,10 @@ class TestBlockchainState(unittest.TestCase):
         self.assertEqual(self.bs.get_tx_blockhash(self.txhash[:-1] + '0'),
                          (None, False))
 
+    def test_get_previous_blockinfo(self):
+        self.assertEqual(self.bs.get_previous_blockinfo(self.blockhash)[0],
+                         self.previous_blockhash)
+        
     def test_ensure(self):
         self.tx.ensure_input_values()
         self.assertTrue(self.tx.have_input_values)
