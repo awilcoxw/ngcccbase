@@ -501,6 +501,151 @@ class EPOBCColorDefinition(GenesisColorDefinition):
         composed_tx_spec.txins[0].set_nSequence(tag.to_nSequence())
         return composed_tx_spec
 
+class SPOBCColorDefinition(GenesisColorDefinition):
+    CLASS_CODE = 'spobc'
+
+    MINIMUM_SATOSHI = 5430
+
+    def run_kernel(self, tx, in_colorvalues):
+        """Given a transaction tx and the colorvalues in a list
+        in_colorvalues, output the colorvalues of the outputs in a list
+        """
+        log("in_colorvalues: %s", in_colorvalues)
+        tx.ensure_input_values()
+        out_colorvalues = []
+        for out_idx, output in enumerate(tx.outputs):
+            out_value_wop = tx.outputs[out_idx].value - padding
+            if out_value_wop <= 0:
+                out_colorvalues.append(None)
+                continue
+            affecting_inputs = tx.input[0]
+            log("affecting inputs: %s", affecting_inputs)
+            ai_colorvalue = SimpleColorValue(colordef=self, value=0)
+            all_colored = True
+            for ai in affecting_inputs:
+                if in_colorvalues[ai] is None:
+                    all_colored = False
+                    break
+                ai_colorvalue += in_colorvalues[ai]
+            log("all colored: %s, colorvalue:%s", all_colored, ai_colorvalue.get_value())
+            if (not all_colored) or (ai_colorvalue.get_value() < out_value_wop):
+                out_colorvalues.append(None)
+                continue
+            out_colorvalues.append(SimpleColorValue(colordef=self, value=out_value_wop))
+        log("out_colorvalues: %s", out_colorvalues)
+        return out_colorvalues
+
+    def get_affecting_inputs(self, tx, output_set):
+        tag = self.get_tag(tx)
+        if (tag is None) or tag.is_genesis:
+            return set()
+        tx.ensure_input_values()
+        aii = set()
+        for out_idx in output_set:
+            aii.update(self.get_xfer_affecting_inputs(
+                    tx, tag.get_padding(), out_idx))
+        inputs = set([tx.inputs[i] for i in aii])
+        return inputs
+
+    def compose_tx_spec(self, op_tx_spec):
+        targets_by_color = group_targets_by_color(op_tx_spec.get_targets(), self.__class__)
+        uncolored_targets = targets_by_color.pop(UNCOLORED_MARKER.color_id, [])
+        composed_tx_spec = op_tx_spec.make_composed_tx_spec()
+        if uncolored_targets:
+            uncolored_needed = ColorTarget.sum(uncolored_targets)
+        else:
+            uncolored_needed = SimpleColorValue(colordef=UNCOLORED_MARKER,
+                                                value=0)
+        dust_threshold = op_tx_spec.get_dust_threshold().get_value()
+        inputs_by_color = dict()
+        min_padding = 0
+
+        # step 1: get inputs, create change targets, compute min padding
+        for color_id, targets in targets_by_color.items():
+            color_def = targets[0].get_colordef()
+            needed_sum = ColorTarget.sum(targets)
+            inputs, total = op_tx_spec.select_coins(needed_sum)
+            inputs_by_color[color_id] = inputs
+            change = total - needed_sum
+            if change > 0:
+                targets.append(
+                    ColorTarget(op_tx_spec.get_change_addr(color_def), change))
+            for target in targets:
+                padding_needed = dust_threshold - target.get_value() 
+                if padding_needed > min_padding:
+                    min_padding = padding_needed
+
+        tag = self.Tag(self.Tag.closest_padding_code(min_padding), False)
+        padding = tag.get_padding()
+
+        # step 2: create txins & txouts, compute uncolored requirements
+        for color_id, targets in targets_by_color.items():
+            color_def = targets[0].get_colordef()
+            for inp in inputs_by_color[color_id]:
+                composed_tx_spec.add_txin(inp)
+                uncolored_needed -= SimpleColorValue(colordef=UNCOLORED_MARKER,
+                                               value=inp.value)
+            for target in targets:
+                svalue = target.get_value() + padding
+                composed_tx_spec.add_txout(value=svalue,
+                                           target=target)
+                uncolored_needed += SimpleColorValue(colordef=UNCOLORED_MARKER,
+                                               value=svalue)
+                print uncolored_needed
+
+        composed_tx_spec.add_txouts(uncolored_targets)
+        fee = composed_tx_spec.estimate_required_fee()
+
+        uncolored_change = None
+
+        if uncolored_needed + fee > 0:
+            uncolored_inputs, uncolored_total = op_tx_spec.select_coins(uncolored_needed, composed_tx_spec)
+            composed_tx_spec.add_txins(uncolored_inputs)
+            fee = composed_tx_spec.estimate_required_fee()
+            uncolored_change = uncolored_total - uncolored_needed - fee
+        else:
+            uncolored_change =  (- uncolored_needed) - fee
+            
+        if uncolored_change > op_tx_spec.get_dust_threshold():
+            composed_tx_spec.add_txout(value=uncolored_change,
+                                       target_addr=op_tx_spec.get_change_addr(UNCOLORED_MARKER),
+                                       is_fee_change=True)
+
+        composed_tx_spec.txins[0].set_nSequence(tag.to_nSequence())
+
+        return composed_tx_spec
+
+    @classmethod
+    def compose_genesis_tx_spec(cls, op_tx_spec):
+        if len(op_tx_spec.get_targets()) != 1:
+            raise InvalidTargetError(
+                'genesis transaction spec needs exactly one target')
+        g_target = op_tx_spec.get_targets()[0]
+        if g_target.get_colordef() != GENESIS_OUTPUT_MARKER:
+            raise InvalidColorError(
+                'genesis transaction target should use -1 color_id')
+        g_value = g_target.get_value()
+        padding_needed = op_tx_spec.get_dust_threshold().get_value() - g_value
+        tag = cls.Tag(cls.Tag.closest_padding_code(padding_needed), True)
+        padding = tag.get_padding()
+        composed_tx_spec = op_tx_spec.make_composed_tx_spec()
+        composed_tx_spec.add_txout(value=padding + g_value,
+                                   target=g_target)
+        uncolored_needed = SimpleColorValue(colordef=UNCOLORED_MARKER,
+                                           value=padding + g_value)        
+        uncolored_inputs, uncolored_total = op_tx_spec.select_coins(uncolored_needed, 
+                                                                    composed_tx_spec)
+        composed_tx_spec.add_txins(uncolored_inputs)
+
+        fee = composed_tx_spec.estimate_required_fee()
+        change = uncolored_total - uncolored_needed - fee
+        if change > op_tx_spec.get_dust_threshold():
+            composed_tx_spec.add_txout(value=change,
+                                       target_addr=op_tx_spec.get_change_addr(UNCOLORED_MARKER),
+                                       is_fee_change=True)
+        composed_tx_spec.txins[0].set_nSequence(tag.to_nSequence())
+        return composed_tx_spec
+
 
 ColorDefinition.register_color_def_class(OBColorDefinition)
 ColorDefinition.register_color_def_class(EPOBCColorDefinition)
